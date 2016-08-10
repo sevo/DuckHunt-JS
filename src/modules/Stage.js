@@ -186,12 +186,10 @@ class Stage extends PIXI.Container {
       this.flashScreen.visible = false;
     }, FLASH_MS);
 
-    clickPoint.x /= this.scale.x;
-    clickPoint.y /= this.scale.y;
     let ducksShot = 0;
     for (let i = 0; i < this.ducks.length; i++) {
       let duck = this.ducks[i];
-      if (duck.alive && Utils.pointDistance(duck.position, clickPoint) < 60) {
+      if (duck.alive && Utils.pointDistance(duck.position, clickPoint) < 80) {
         ducksShot++;
         duck.shot();
         duck.timeline.add(() => {

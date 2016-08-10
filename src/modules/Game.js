@@ -10,6 +10,9 @@ const BLUE_SKY_COLOR = 0x64b0ff;
 const PINK_SKY_COLOR = 0xfbb4d4;
 const SUCCESS_RATIO = 0.6;
 
+const MAX_X = 800;
+const MAX_Y = 600;
+
 class Game {
   /**
    * Game Constructor
@@ -219,6 +222,21 @@ class Game {
     }
   }
 
+  createAim() {
+    let gameTextures = PIXI.loader.resources[this.spritesheet].textures;
+    let texture = gameTextures['hud/aim/0.png'];
+    this.aim = new PIXI.Sprite(texture);
+
+    this.aim.anchor.x = 0.5;
+    this.aim.anchor.y = 0.5;
+
+    // move the sprite t the center of the screen
+    this.aim.position.x = 200;
+    this.aim.position.y = 150;
+
+    this.stage.addChild(this.aim);
+  }
+
   load() {
     this.loader
       .add(this.spritesheet)
@@ -235,6 +253,7 @@ class Game {
     this.scaleToWindow();
     this.bindEvents();
     this.startLevel();
+    this.createAim();
     this.animate();
 
   }
@@ -353,8 +372,8 @@ class Game {
       sound.play('gunSound');
       this.bullets -= 1;
       this.updateScore(this.stage.shotsFired({
-        x: event.data.global.x,
-        y: event.data.global.y
+        x: this.aim.position.x,
+        y: this.aim.position.y
       }));
     }
   }
@@ -373,6 +392,71 @@ class Game {
     this.stage.mousedown = this.stage.touchstart = _noop;
   }
 
+  getGazeData() {
+    let getGazePoint = function(gd_lval, gd_lx, gd_ly, gd_rval, gd_rx, gd_ry) {
+
+      var offx = screenX;// + (window.outerWidth - window.innerWidth);
+      var offy = screenY + (window.outerHeight - window.innerHeight);// + (screen.height - screen.availHeight) ;
+
+      var lx = Math.round(screen.width * gd_lx) - offx;
+      var ly = Math.round(screen.height * gd_ly) - offy;
+      var rx = Math.round(screen.width * gd_rx) - offx;
+      var ry = Math.round(screen.height * gd_ry) - offy;
+
+      if (gd_lval < 2 && gd_rval < 2) {
+        var cx = (lx + rx) / 2;
+        var cy = (ly + ry) / 2;
+        return { x: cx, y: cy };
+      }
+      else {
+        if (gd_lval < 2) {
+
+          return { x: lx, y: ly };
+        }
+
+        if (gd_rval < 2) {
+          return { x: rx, y: ry };
+        }
+      }
+      return null;
+    };
+
+    let getXY = function(data) {
+      return getGazePoint(data.LeftValidity, data.LeftGazePoint2D.X, data.LeftGazePoint2D.Y,
+          data.RightValidity, data.RightGazePoint2D.X, data.RightGazePoint2D.Y);
+    };
+
+    let handleGazeData = function(that, gazeData) {
+      let JSONdata = JSON.parse(gazeData).LastData;
+      let gazePosition = getXY(JSONdata);
+      if (gazePosition) {
+        that.aim.position.x = gazePosition.x / (window.innerWidth / MAX_X);
+        that.aim.position.y = gazePosition.y / (window.innerHeight / MAX_Y);
+      }
+
+    };
+    let xmlhttp = new XMLHttpRequest();
+
+    xmlhttp.onreadystatechange = (function(that) {
+      return function() {
+        if (xmlhttp.readyState == XMLHttpRequest.DONE) {
+          if (xmlhttp.status == 200) {
+            handleGazeData(that, xmlhttp.responseText);
+          }
+          else if (xmlhttp.status == 400) {
+            console.log('There was an error 400');
+          }
+          else {
+            console.log('something else other than 200 was returned');
+          }
+        }
+      };
+    })(this);
+
+    xmlhttp.open('GET', 'http://localhost:64238/api/Gaze/Recent', true);
+    xmlhttp.send();
+  }
+
   animate() {
     this.renderer.render(this.stage);
 
@@ -380,7 +464,7 @@ class Game {
         this.unbindInteractions();
         this.endWave();
       }
-
+    this.getGazeData();
     requestAnimationFrame(this.animate.bind(this));
   }
 }
